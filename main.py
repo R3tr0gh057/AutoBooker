@@ -63,25 +63,25 @@ async def handle_window(page, window_number):
         # Wait before the next refresh attempt
         await asyncio.sleep(0.5)  # Adjust as needed
 
-async def open_multiple_windows(number_of_windows):
+async def open_and_handle_window(browser, window_number):
+    # Concurrent execution
+    context = await browser.new_context()  # Create a new browser context (window)
+    page = await context.new_page()  # Create a new page in that context
+    print(f"Opening window {window_number}...")
+    await page.goto(url)  # Navigate to the target URL
+    await handle_window(page, window_number)  # Start handling this window immediately
+
+async def open_multiple_windows_concurrently(number_of_windows):
+    # Asyncio for concurrency
     async with async_playwright() as p:
         # Launch the browser in headed mode (with UI)
         browser = await p.chromium.launch(headless=False)  # Set headless=False for headed mode
 
-        # Open multiple windows (contexts)
-        pages = []
-        for _ in range(number_of_windows):
-            context = await browser.new_context()  # Create a new browser context (window)
-            page = await context.new_page()  # Create a new page in that context
-            pages.append(page)
+        # Create tasks to open and handle windows concurrently
+        tasks = [asyncio.create_task(open_and_handle_window(browser, i + 1)) for i in range(number_of_windows)]
 
-        # Open the website in each window and start the process
-        for i, page in enumerate(pages):
-            print(f"Opening window {i + 1}...")
-            await page.goto(url)
-
-        # Start the refresh loop in all windows concurrently
-        await asyncio.gather(*(handle_window(page, i + 1) for i, page in enumerate(pages)))
+        # Wait for all tasks to complete
+        await asyncio.gather(*tasks)
 
         # Wait for user input to close the browser
         input('Press Enter to close the browser...')
@@ -91,4 +91,4 @@ async def open_multiple_windows(number_of_windows):
 num_windows = int(input("How many windows would you like to open? "))
 
 # Run the asynchronous function
-asyncio.run(open_multiple_windows(num_windows))
+asyncio.run(open_multiple_windows_concurrently(num_windows))
